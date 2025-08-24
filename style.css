@@ -1,0 +1,468 @@
+:root {
+    --primary-cyan: #00f3ff;
+    --primary-cyan-dark: #06b6d4;
+    --primary-cyan-darker: #0891b2;
+    --dark-bg: #0f172a;
+    --dark-container: #1e293b;
+    --light-bg: #e5e7eb;
+    --light-container: #d1d5db;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Orbitron', sans-serif;
+    transition: background-color 0.5s, color 0.5s;
+    background: linear-gradient(135deg, var(--dark-bg) 0%, var(--dark-container) 100%);
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: white;
+}
+
+body.light-mode {
+    background: linear-gradient(135deg, var(--light-bg) 0%, var(--light-container) 100%);
+    color: #111827;
+}
+
+.assistant-bubble, .user-bubble {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(10px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+.listening-indicator {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+   50% {
+        opacity: 0.5;
+    }
+}
+
+.glow-shadow {
+    box-shadow: 0 0 15px rgba(0, 191, 255, 0.4);
+}
+
+.cyber-border {
+    position: relative;
+    border: 1px solid rgba(0, 231, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 231, 255, 0.6),
+                inset 0 0 10px rgba(0, 231, 255, 0.6);
+}
+
+.cyber-border::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    border: 1px solid rgba(0, 231, 255, 0.2);
+    pointer-events: none;
+}
+
+.grid-pattern {
+    background-image: 
+        linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.terminal-text {
+    color: var(--primary-cyan);
+    text-shadow: 0 0 5px var(--primary-cyan);
+}
+
+.hud-element {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 231, 255, 0.4);
+    box-shadow: 0 0 15px rgba(0, 231, 255, 0.5);
+}
+
+.radar-sweep {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, transparent, rgba(0, 231, 255, 0.8), transparent);
+    animation: radarMove 3s linear infinite;
+}
+
+@keyframes radarMove {
+    0% { 
+        transform: translateX(-100%); 
+    }
+    100% { 
+        transform: translateX(100%); 
+    }
+}
+
+.power-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: pulse 1.5s infinite;
+}
+
+/* Light Mode Styles */
+.light-mode .container-bg { 
+    background-color: var(--light-container); 
+    border-color: #9ca3af; 
+}
+
+.light-mode .header-text { 
+    color: #0369a1; 
+}
+
+.light-mode .subheader-text { 
+    color: #374151; 
+}
+
+.light-mode .log-bg { 
+    background-color: #f9fafb; 
+}
+
+.light-mode .assistant-bubble { 
+    background-color: #a5f3fc; 
+    color: #083344; 
+}
+
+.light-mode .user-bubble { 
+    background-color: #e5e7eb; 
+    color: #1f2937; 
+}
+
+.light-mode .glow-shadow { 
+    box-shadow: 0 0 15px rgba(0, 127, 255, 0.3); 
+}
+
+.light-mode .cyber-border {
+    border: 1px solid rgba(0, 127, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 127, 255, 0.3),
+                inset 0 0 10px rgba(0, 127, 255, 0.3);
+}
+
+.light-mode .grid-pattern {
+    background-image: 
+        linear-gradient(rgba(0, 127, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 127, 255, 0.1) 1px, transparent 1px);
+}
+
+.light-mode .terminal-text {
+    color: #0077ff;
+    text-shadow: 0 0 3px #0077ff;
+}
+
+.light-mode .hud-element {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 127, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 127, 255, 0.3);
+}
+
+/* Manual CSS for elements to reduce Tailwind dependency */
+.jarvis-container {
+    width: 100%;
+    max-width: 48rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 1.5rem;
+    background-color: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(4px);
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+@media (min-width: 768px) {
+    .jarvis-container {
+        padding: 2rem;
+    }
+}
+
+.jarvis-btn {
+    width: 100%;
+    background-color: var(--primary-cyan-darker);
+    color: white;
+    font-weight: bold;
+    padding: 0.75rem 2rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s;
+    transform: scale(1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(34, 211, 238, 0.5);
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+}
+
+@media (min-width: 768px) {
+    .jarvis-btn {
+        width: auto;
+    }
+}
+
+.jarvis-btn:hover {
+    background-color: var(--primary-cyan-dark);
+    transform: scale(1.05);
+}
+
+.jarvis-btn:active {
+    transform: scale(0.98);
+}
+
+.jarvis-log {
+    background-color: rgba(17, 24, 39, 0.7);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    height: 24rem;
+    overflow-y: auto;
+    border: 1px solid rgba(55, 65, 81, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Notification styles */
+.notification-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 350px;
+}
+
+.notification {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: rgba(17, 24, 39, 0.9);
+    border-left: 4px solid var(--primary-cyan);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.notification.success {
+    border-left-color: #10b981;
+}
+
+.notification.warning {
+    border-left-color: #f59e0b;
+}
+
+.notification.error {
+    border-left-color: #ef4444;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+    color: var(--primary-cyan);
+}
+
+.notification-message {
+    font-size: 0.875rem;
+    color: #e5e7eb;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 1.25rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-close:hover {
+    color: white;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Command panel styles */
+.command-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.command-panel.open {
+    max-height: 300px;
+}
+
+.command-category {
+    margin-bottom: 1rem;
+}
+
+.command-category h4 {
+    color: var(--primary-cyan);
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.command-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+    .command-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.command-item {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 0.25rem;
+    border-left: 2px solid var(--primary-cyan);
+}
+
+/* System status styles */
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-online {
+    background-color: #10b981;
+    box-shadow: 0 0 5px #10b981;
+}
+
+.status-offline {
+    background-color: #ef4444;
+}
+
+.status-processing {
+    background-color: #f59e0b;
+    animation: pulse 1.5s infinite;
+}
+
+/* Animation for elements */
+@keyframes glow {
+    0% {
+        box-shadow: 0 0 5px var(--primary-cyan);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--primary-cyan);
+    }
+   100% {
+        box-shadow: 0 0 5px var(--primary-cyan);
+    }
+}
+
+.glow-animation {
+    animation: glow 2s infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-cyan-dark);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-cyan);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .jarvis-container {
+        padding: 1rem;
+    }
+    
+    .jarvis-log {
+        height: 20rem;
+    }
+    
+    .notification-container {
+        left: 1rem;
+        right: 1rem;
+        max-width: none;
+    }
+}

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS Virtual Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-mode">
+    <div class="notification-container" id="notification-container"></div>
+    
+    <div class="fixed top-4 left-4 hud-element px-3 py-2 rounded-md flex items-center gap-2 z-10">
+        <div class="power-indicator"></div>
+        <span class="terminal-text text-sm">SYSTEM ONLINE</span>
+    </div>
+    
+    <div class="fixed top-4 right-4 hud-element px-3 py-2 rounded-md z-10">
+        <span id="current-time" class="terminal-text text-sm">00:00:00</span>
+    </div>
+    
+    <div class="fixed bottom-4 left-4 hud-element px-3 py-2 rounded-md z-10 hidden md:block">
+        <span class="terminal-text text-sm">VOICE RECOGNITION ACTIVE</span>
+    </div>
+
+    <div class="jarvis-container cyber-border grid-pattern space-y-8">
+        <div class="radar-sweep"></div>
+        
+        <div class="text-center flex flex-col items-center justify-center gap-4">
+            <div class="flex items-center justify-center gap-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-cyan-400"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
+                <h1 class="header-text text-5xl font-bold text-cyan-400 tracking-wider terminal-text">J.A.R.V.I.S.</h1>
+            </div>
+            <p class="subheader-text text-cyan-300/80 text-sm">Just A Rather Very Intelligent System</p>
+            
+            <div class="system-status">
+                <div class="status-indicator status-online"></div>
+                <span class="text-xs">All systems operational</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+            <button id="startBtn" class="jarvis-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg>
+                <span id="button-text">Activate Listening</span>
+            </button>
+            <div id="status" class="subheader-text text-cyan-300 h-6 text-center md:text-left terminal-text">AWAITING COMMAND</div>
+        </div>
+        
+        <div id="conversation-log" class="jarvis-log space-y-4">
+            <div class="flex justify-start">
+                <div class="assistant-bubble bg-cyan-500/20 text-cyan-200 p-3 rounded-lg max-w-md cyber-border">
+                    <p class="font-semibold">JARVIS</p>
+                    <p>System online and operational. Say "Jarvis start" to activate voice recognition.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mt-4">
+            <button id="toggleCommands" class="text-cyan-400 text-sm flex items-center gap-2">
+                <span>Show Available Commands</span>
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <button id="themeToggleBtn" class="text-cyan-400 text-sm flex items-center gap-2">
+                <span>Toggle Theme</span>
+                <i class="fas fa-adjust"></i>
+            </button>
+        </div>
+
+        <div id="command-panel" class="command-panel">
+            <div class="hud-element p-4 rounded-md">
+                <h3 class="terminal-text text-sm font-bold mb-4 text-center">VOICE COMMANDS</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="command-category">
+                        <h4>Basic Commands</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, hello"</div>
+                            <div class="command-item">"Jarvis, how are you?"</div>
+                            <div class="command-item">"Jarvis, who are you?"</div>
+                            <div class="command-item">"Jarvis, what can you do?"</div>
+                            <div class="command-item">"Jarvis, thank you"</div>
+                            <div class="command-item">"Jarvis, goodbye"</div>
+                            <div class="command-item">"Jarvis, start"</div>
+                        </div>
+                    </div>
+                    
+                    <div class="command-category">
+                        <h4>Time & Date</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, what time is it?"</div>
+                            <div class="command-item">"Jarvis, what date is it?"</div>
+                            <div class="command-item">"Jarvis, what day is it?"</div>
+                            <div class="command-item">"Jarvis, what month is it?"</div>
+                            <div class="command-item">"Jarvis, what year is it?"</div>
+                            <div class="command-item">"Jarvis, what week is it?"</div>
+                        </div>
+                    </div>
+                    
+                    <div class="command-category">
+                        <h4>Web & Search</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, open Google"</div>
+                            <div class="command-item">"Jarvis, open YouTube"</div>
+                            <div class="command-item">"Jarvis, open Amazon"</div>
+                            <div class="command-item">"Jarvis, open Reddit"</div>
+                            <div class="command-item">"Jarvis, open Wikipedia"</div>
+                            <div class="command-item">"Jarvis, open Netflix"</div>
+                            <div class="command-item">"Jarvis, open Twitter"</div>
+                            <div class="command-item">"Jarvis, open Facebook"</div>
+                            <div class="command-item">"Jarvis, open Instagram"</div>
+                            <div class="command-item">"Jarvis, open GitHub"</div>
+                            <div class="command-item">"Jarvis, open Gmail"</div>
+                            <div class="command-item">"Jarvis, open Outlook"</div>
+                            <div class="command-item">"Jarvis, search for..."</div>
+                        </div>
+                    </div>
+                    
+                    <div class="command-category">
+                        <h4>Productivity</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, calculate..."</div>
+                            <div class="command-item">"Jarvis, what's the weather?"</div>
+                            <div class="command-item">"Jarvis, remind me to..."</div>
+                            <div class="command-item">"Jarvis, what are my tasks?"</div>
+                            <div class="command-item">"Jarvis, clear my tasks"</div>
+                            <div class="command-item">"Jarvis, set a timer for..."</div>
+                            <div class="command-item">"Jarvis, take a note"</div>
+                            <div class="command-item">"Jarvis, create a reminder"</div>
+                        </div>
+                    </div>
+                    
+                    <div class="command-category">
+                        <h4>Entertainment</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, tell me a joke"</div>
+                            <div class="command-item">"Jarvis, tell me a fact"</div>
+                            <div class="command-item">"Jarvis, play music"</div>
+                            <div class="command-item">"Jarvis, stop music"</div>
+                            <div class="command-item">"Jarvis, next track"</div>
+                            <div class="command-item">"Jarvis, previous track"</div>
+                            <div class="command-item">"Jarvis, play news"</div>
+                            <div class="command-item">"Jarvis, movie recommendations"</div>
+                        </div>
+                    </div>
+                    
+                    <div class="command-category">
+                        <h4>System Controls</h4>
+                        <div class="command-list">
+                            <div class="command-item">"Jarvis, toggle theme"</div>
+                            <div class="command-item">"Jarvis, increase volume"</div>
+                            <div class="command-item">"Jarvis, decrease volume"</div>
+                            <div class="command-item">"Jarvis, mute"</div>
+                            <div class="command-item">"Jarvis, unmute"</div>
+                            <div class="command-item">"Jarvis, system status"</div>
+                            <div class="command-item">"Jarvis, help"</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
