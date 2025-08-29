@@ -1,839 +1,978 @@
 // ==================== INITIALIZATION ====================
-// Prevent any extension interference
+
+// Guard against weird extensions
 if (typeof solveSimpleChallenge !== 'undefined') {
-    console.warn('Extension function detected, ignoring it');
-    window.solveSimpleChallenge = undefined;
+  console.warn('Extension function detected, ignoring it');
+  window.solveSimpleChallenge = undefined;
 }
 
 // DOM Elements
 const startBtn = document.getElementById('startBtn');
 const buttonText = document.getElementById('button-text');
 const statusDiv = document.getElementById('status');
+const statusMini = document.getElementById('status-mini');
+const statusLed = document.getElementById('status-led');
 const conversationLog = document.getElementById('conversation-log');
 const currentTimeElement = document.getElementById('current-time');
 const toggleCommandsBtn = document.getElementById('toggleCommands');
-const themeToggleBtn = document.getElementById('themeToggleBtn'); // New theme toggle button
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const settingsBtn = document.getElementById('settingsBtn');
 const commandPanel = document.getElementById('command-panel');
+const settingsPanel = document.getElementById('settings-panel');
 const notificationContainer = document.getElementById('notification-container');
+const micStatus = document.getElementById('mic-status');
+
+const textInput = document.getElementById('textCommandInput');
+const sendCmdBtn = document.getElementById('sendCommandBtn');
+const voiceSelect = document.getElementById('voiceSelect');
+const rateRange = document.getElementById('rateRange');
+const pitchRange = document.getElementById('pitchRange');
+const volumeRange = document.getElementById('volumeRange');
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList || null;
 const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+let recognitionRunning = false;
 let isListening = false;
-let isWaitingForCommand = false;
 let isActiveSession = false;
-const wakeWord = 'jarvis';
-const userName = 'Friend'; // Your name for personalized responses
+let lastTranscript = '';
+const WAKE_WORD = 'jarvis';
 
-// Application State
-let tasks = JSON.parse(localStorage.getItem('jarvisTasks')) || [];
-let reminders = JSON.parse(localStorage.getItem('jarvisReminders')) || [];
-let timers = JSON.parse(localStorage.getItem('jarvisTimers')) || [];
-let volume = localStorage.getItem('jarvisVolume') ? parseInt(localStorage.getItem('jarvisVolume')) : 50;
+// App State
+let tasks = safeJSON(localStorage.getItem('jarvisTasks'), []) || [];
+let reminders = safeJSON(localStorage.getItem('jarvisReminders'), []) || [];
+let timers = safeJSON(localStorage.getItem('jarvisTimers'), []) || [];
+let volume = localStorage.getItem('jarvisVolume') ? parseInt(localStorage.getItem('jarvisVolume'), 10) : 70;
+let selectedVoiceURI = localStorage.getItem('jarvisVoiceURI') || null;
+let rate = parseFloat(localStorage.getItem('jarvisRate') || '1.05');
+let pitch = parseFloat(localStorage.getItem('jarvisPitch') || '0.95');
+let userName = localStorage.getItem('jarvisUserName') || 'Friend';
 let isMusicPlaying = false;
 let currentTrackIndex = 0;
 
 // Music tracks (simulated)
 const musicTracks = [
-    { title: "Beyond the Horizon", artist: "SynthWave Revolution" },
-    { title: "Neon Dreams", artist: "Cyber Pulse" },
-    { title: "Digital Sunrise", artist: "Vector Wave" },
-    { title: "Circuit Breaker", artist: "Techno Logic" },
-    { title: "Virtual Reality", artist: "Digital Dimension" }
+  { title: "Beyond the Horizon", artist: "SynthWave Revolution" },
+  { title: "Neon Dreams", artist: "Cyber Pulse" },
+  { title: "Digital Sunrise", artist: "Vector Wave" },
+  { title: "Circuit Breaker", artist: "Techno Logic" },
+  { title: "Virtual Reality", artist: "Digital Dimension" }
 ];
 
-// Jokes database
+// Jokes & Facts
 const jokes = [
-    "Why don't scientists trust atoms? Because they make up everything!",
-    "I told my wife she should embrace her mistakes. She gave me a hug.",
-    "Why did the scarecrow win an award? Because he was outstanding in his field!",
-    "What do you call fake spaghetti? An Impasta!",
-    "Why did the computer go to the doctor? Because it had a virus!",
-    "What's a robot's favorite snack? Computer chips!",
-    "Why was the math book sad? Because it had too many problems.",
-    "What did one ocean say to the other ocean? Nothing, they just waved.",
-    "Why don't skeletons fight each other? They don't have the guts.",
-    "What do you call a bear with no teeth? A gummy bear!"
+  "Why don't scientists trust atoms? Because they make up everything!",
+  "I told my wife she should embrace her mistakes. She gave me a hug.",
+  "Why did the scarecrow win an award? Because he was outstanding in his field!",
+  "What do you call fake spaghetti? An impasta!",
+  "Why did the computer go to the doctor? Because it had a virus!",
+  "What's a robot's favorite snack? Computer chips!",
+  "Why was the math book sad? Because it had too many problems.",
+  "What did one ocean say to the other ocean? Nothing, they just waved.",
+  "Why don't skeletons fight each other? They don't have the guts.",
+  "What do you call a bear with no teeth? A gummy bear!"
 ];
-
-// Facts database
 const facts = [
-    "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
-    "Octopuses have three hearts.",
-    "The shortest war in history lasted only 38 minutes between Britain and Zanzibar in 1896.",
-    "A group of flamingos is called a 'flamboyance'.",
-    "The world's oldest known living tree is a bristlecone pine in California, aged over 5,000 years.",
-    "Bananas are berries, but strawberries aren't.",
-    "A day on Venus is longer than a year on Venus.",
-    "The inventor of the Pringles can is now buried in one.",
-    "The unicorn is the national animal of Scotland.",
-    "There are more possible iterations of a game of chess than there are atoms in the known universe."
+  "Honey never spoils. Archaeologists found 3,000-year-old honey still edible.",
+  "Octopuses have three hearts.",
+  "A day on Venus is longer than a year on Venus.",
+  "Bananas are berries, but strawberries aren't.",
+  "There are more possible chess games than atoms in the known universe."
 ];
 
-// Website database
+// Known websites
 const websites = {
-    'google': 'https://www.google.com',
-    'youtube': 'https://www.youtube.com',
-    'amazon': 'https://www.amazon.com',
-    'reddit': 'https://www.reddit.com',
-    'wikipedia': 'https://www.wikipedia.org',
-    'netflix': 'https://www.netflix.com',
-    'twitter': 'https://www.twitter.com',
-    'facebook': 'https://www.facebook.com',
-    'instagram': 'https://www.instagram.com',
-    'github': 'https://www.github.com',
-    'gmail': 'https://mail.google.com',
-    'outlook': 'https://outlook.live.com'
+  google: 'https://www.google.com',
+  youtube: 'https://www.youtube.com',
+  amazon: 'https://www.amazon.com',
+  reddit: 'https://www.reddit.com',
+  wikipedia: 'https://www.wikipedia.org',
+  netflix: 'https://www.netflix.com',
+  twitter: 'https://www.twitter.com',
+  x: 'https://www.twitter.com',
+  facebook: 'https://www.facebook.com',
+  instagram: 'https://www.instagram.com',
+  github: 'https://www.github.com',
+  gmail: 'https://mail.google.com',
+  outlook: 'https://outlook.live.com'
 };
 
-// ==================== UTILITY FUNCTIONS ====================
-
-// Update time display
-function updateTime() {
-    const now = new Date();
-    currentTimeElement.textContent = now.toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit' 
-    });
-    
-    // Check reminders
-    checkReminders(now);
-    
-    // Check timers
-    checkTimers(now);
+// ==================== UTILITIES ====================
+function safeJSON(str, fallback) {
+  try { return JSON.parse(str); } catch { return fallback; }
 }
-
-// Initialize time update
-setInterval(updateTime, 1000);
-updateTime();
-
-// Show notification function
 function showNotification(title, message, type = 'info', duration = 5000) {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    
-    notification.innerHTML = `
-        <div class="notification-icon">
-            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
-        </div>
-        <div class="notification-content">
-            <div class="notification-title">${title}</div>
-            <div class="notification-message">${message}</div>
-        </div>
-        <button class="notification-close">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    notificationContainer.appendChild(notification);
-    
-    // Add event listener to close button
-    const closeBtn = notification.querySelector('.notification-close');
-    closeBtn.addEventListener('click', () => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
-        setTimeout(() => {
-            notificationContainer.removeChild(notification);
-        }, 300);
-    });
-    
-    // Auto remove after duration
-    if (duration > 0) {
-        setTimeout(() => {
-            if (notification.parentNode === notificationContainer) {
-                notification.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => {
-                    notificationContainer.removeChild(notification);
-                }, 300);
-            }
-        }, duration);
-    }
-    
-    return notification;
+  const n = document.createElement('div');
+  n.className = `notification ${type}`;
+  n.innerHTML = `
+    <div class="notification-icon">
+      <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+    </div>
+    <div class="notification-content">
+      <div class="notification-title">${title}</div>
+      <div class="notification-message">${message}</div>
+    </div>
+    <button class="notification-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+  `;
+  const closeBtn = n.querySelector('.notification-close');
+  closeBtn.addEventListener('click', () => closeNotification(n));
+  notificationContainer.appendChild(n);
+  if (duration > 0) setTimeout(() => closeNotification(n), duration);
+  return n;
+}
+function closeNotification(el) {
+  if (!el || !el.parentNode) return;
+  el.style.animation = 'slideOut .25s ease-in';
+  setTimeout(() => el.parentNode && el.parentNode.removeChild(el), 250);
+}
+function addMessageToLog(sender, message) {
+  const wrapper = document.createElement('div');
+  const bubble = document.createElement('div');
+  const senderP = document.createElement('p');
+  const msgP = document.createElement('p');
+
+  senderP.className = 'font-semibold tracking-wider terminal-text';
+  senderP.textContent = sender;
+  msgP.innerHTML = escapeHTML(message).replace(/\n/g, '<br/>');
+
+  bubble.appendChild(senderP);
+  bubble.appendChild(msgP);
+  wrapper.appendChild(bubble);
+
+  if (sender.toLowerCase() === 'jarvis') {
+    wrapper.className = 'flex justify-start';
+    bubble.className = 'assistant-bubble bg-cyan-500/20 text-cyan-200 p-3 rounded-lg max-w-md cyber-border';
+  } else {
+    wrapper.className = 'flex justify-end';
+    bubble.className = 'user-bubble bg-gray-700 text-white p-3 rounded-lg max-w-md';
+  }
+
+  conversationLog.appendChild(wrapper);
+  conversationLog.scrollTop = conversationLog.scrollHeight;
+}
+function escapeHTML(s) {
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+function updateTime() {
+  const now = new Date();
+  currentTimeElement.textContent = now.toLocaleTimeString([], {hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  checkDueItems(now);
+}
+setInterval(updateTime, 1000); updateTime();
+
+function setStatus(text, processing = false) {
+  statusDiv.textContent = text;
+  statusMini.textContent = text;
+  statusLed.className = `status-indicator ${processing ? 'status-processing' : 'status-online'}`;
 }
 
-// Check reminders function
-function checkReminders(now) {
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-    const currentDate = now.toDateString();
-    
-    reminders.forEach((reminder, index) => {
-        if (reminder.date === currentDate && reminder.time === currentTime && !reminder.triggered) {
-            // Show notification
-            showNotification('Reminder', reminder.text, 'info', 10000);
-            
-            // Speak reminder
-            speak(`Reminder: ${reminder.text}`);
-            
-            // Mark as triggered
-            reminders[index].triggered = true;
-            localStorage.setItem('jarvisReminders', JSON.stringify(reminders));
-        }
-    });
+// ==================== AUDIO / TTS ====================
+function getVoices() {
+  return speechSynthesis.getVoices();
 }
-
-// Check timers function
-function checkTimers(now) {
-    timers.forEach((timer, index) => {
-        if (now >= timer.endTime && !timer.triggered) {
-            // Show notification
-            showNotification('Timer Completed', `Your timer for ${timer.duration} ${timer.unit} has ended`, 'info', 10000);
-            
-            // Speak alert
-            speak(`Timer completed. Your timer for ${timer.duration} ${timer.unit} has ended.`);
-            
-            // Play alert sound
-            playAlertSound();
-            
-            // Mark as triggered
-            timers[index].triggered = true;
-            localStorage.setItem('jarvisTimers', JSON.stringify(timers));
-        }
-    });
+function populateVoices() {
+  const voices = getVoices();
+  voiceSelect.innerHTML = '';
+  voices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.voiceURI;
+    opt.textContent = `${v.name} ${v.lang}${v.default ? ' (default)' : ''}`;
+    voiceSelect.appendChild(opt);
+  });
+  // Restore selection or pick default
+  const voiceToUse = voices.find(v => v.voiceURI === selectedVoiceURI) || voices.find(v => v.default) || voices[0];
+  if (voiceToUse) {
+    voiceSelect.value = voiceToUse.voiceURI;
+    selectedVoiceURI = voiceToUse.voiceURI;
+  }
 }
+speechSynthesis.onvoiceschanged = populateVoices;
+window.addEventListener('load', () => setTimeout(populateVoices, 200));
 
-// Play alert sound
-function playAlertSound() {
-    // In a real implementation, you would play an actual sound
-    console.log("Playing alert sound");
-}
+rateRange.value = rate.toString();
+pitchRange.value = pitch.toString();
+volumeRange.value = volume.toString();
 
-// Toggle command panel
-toggleCommandsBtn.addEventListener('click', () => {
-    commandPanel.classList.toggle('open');
-    const icon = toggleCommandsBtn.querySelector('i');
-    
-    if (commandPanel.classList.contains('open')) {
-        toggleCommandsBtn.querySelector('span').textContent = 'Hide Available Commands';
-        icon.className = 'fas fa-chevron-up';
-    } else {
-        toggleCommandsBtn.querySelector('span').textContent = 'Show Available Commands';
-        icon.className = 'fas fa-chevron-down';
-    }
+rateRange.addEventListener('input', () => {
+  rate = parseFloat(rateRange.value);
+  localStorage.setItem('jarvisRate', rate.toString());
+});
+pitchRange.addEventListener('input', () => {
+  pitch = parseFloat(pitchRange.value);
+  localStorage.setItem('jarvisPitch', pitch.toString());
+});
+volumeRange.addEventListener('input', () => {
+  volume = parseInt(volumeRange.value, 10);
+  localStorage.setItem('jarvisVolume', volume.toString());
+});
+voiceSelect.addEventListener('change', () => {
+  selectedVoiceURI = voiceSelect.value;
+  localStorage.setItem('jarvisVoiceURI', selectedVoiceURI);
 });
 
-// New Theme Toggle Button
-themeToggleBtn.addEventListener('click', () => {
-    document.body.classList.toggle('light-mode');
-    const theme = document.body.classList.contains('light-mode') ? "light" : "dark";
-    speak(`Switched to ${theme} mode.`);
-    showNotification('Theme Changed', `${theme} mode activated`, 'info');
-});
-
-// Open website function
-function openWebsite(siteName) {
-    const siteUrl = websites[siteName.toLowerCase()];
-    if (siteUrl) {
-        speak(`Opening ${siteName}`);
-        window.open(siteUrl, "_blank");
-        showNotification('Browser', `Opening ${siteName}`, 'info');
-    } else {
-        speak(`I don't know how to open ${siteName}`);
-    }
-}
-
-// ==================== CORE FUNCTIONS ====================
-
-// Speak function
-const speak = (message) => {
-    const speechSynthesis = window.speechSynthesis;
-    // Cancel any ongoing speech to prevent overlap
-    speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.rate = 1.1;
-    utterance.pitch = 0.9; // Slightly lower for more robotic tone
-    utterance.volume = volume / 100;
-    
-    utterance.onend = function() {
-        console.log("Finished speaking");
-        // Restart listening if we're in an active session
-        if (isActiveSession && isListening) {
-            setTimeout(() => {
-                try {
-                    recognition.start();
-                    statusDiv.textContent = 'LISTENING';
-                } catch (e) {
-                    console.error("Error restarting recognition:", e);
-                }
-            }, 500);
-        }
-    };
-    
-    utterance.onerror = function(event) {
-        console.error("Speech synthesis error:", event);
-    };
-    
-    speechSynthesis.speak(utterance);
+function speak(message, opts = {}) {
+  if (!('speechSynthesis' in window)) {
     addMessageToLog('JARVIS', message);
-};
+    return;
+  }
+  const { interrupt = true } = opts;
+  if (interrupt) window.speechSynthesis.cancel();
 
-// Add message to log
-const addMessageToLog = (sender, message) => {
-    const messageWrapper = document.createElement('div');
-    const messageBubble = document.createElement('div');
-    const senderP = document.createElement('p');
-    const messageP = document.createElement('p');
-    
-    senderP.className = 'font-semibold tracking-wider terminal-text';
-    senderP.textContent = sender;
-    messageP.textContent = message;
+  const u = new SpeechSynthesisUtterance(message);
+  const voices = getVoices();
+  const voice = voices.find(v => v.voiceURI === selectedVoiceURI) || voices.find(v => v.default);
+  if (voice) u.voice = voice;
+  u.volume = Math.max(0, Math.min(1, (volume || 70) / 100));
+  u.rate = rate || 1.05;
+  u.pitch = pitch || 0.95;
 
-    messageBubble.appendChild(senderP);
-    messageBubble.appendChild(messageP);
-    messageWrapper.appendChild(messageBubble);
+  u.onstart = () => { setStatus('SPEAKING', true); };
+  u.onend = () => {
+    setStatus(isListening ? 'LISTENING' : 'AWAITING COMMAND', isListening);
+    // Try to resume recognition if active
+    if (isActiveSession && isListening) safeStartRecognition();
+  };
+  u.onerror = () => { setStatus('TTS ERROR'); };
 
-    if (sender === 'JARVIS') {
-        messageWrapper.className = 'flex justify-start';
-        messageBubble.className = 'assistant-bubble bg-cyan-500/20 text-cyan-200 p-3 rounded-lg max-w-md cyber-border';
-    } else { // User
-        messageWrapper.className = 'flex justify-end';
-        messageBubble.className = 'user-bubble bg-gray-700 text-white p-3 rounded-lg max-w-md';
+  window.speechSynthesis.speak(u);
+  addMessageToLog('JARVIS', message);
+}
+
+function beep(times = 1, duration = 120, freq = 880) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let when = ctx.currentTime;
+    for (let i = 0; i < times; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.001, when);
+      gain.gain.exponentialRampToValueAtTime(0.2, when + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + duration / 1000);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(when);
+      osc.stop(when + duration / 1000 + 0.02);
+      when += (duration / 1000) + 0.08;
     }
-    
-    conversationLog.appendChild(messageWrapper);
-    conversationLog.scrollTop = conversationLog.scrollHeight;
-};
+  } catch {}
+}
 
-// Get weather function
-const getWeather = async (location = null) => {
-    try {
-        // In a real implementation, you would call a weather API here
-        // For now, we'll use sample data
-        const weatherData = {
-            temperature: Math.floor(Math.random() * 15) + 20, // Random temp between 20-35
-            condition: ["sunny", "cloudy", "rainy", "partly cloudy"][Math.floor(Math.random() * 4)],
-            location: location || "your location",
-            humidity: Math.floor(Math.random() * 40) + 40, // 40-80%
-            wind: Math.floor(Math.random() * 15) + 5 // 5-20 km/h
-        };
-        
-        speak(`Current weather in ${weatherData.location}: ${weatherData.temperature} degrees Celsius with ${weatherData.condition} conditions. Humidity is at ${weatherData.humidity} percent with wind speeds of ${weatherData.wind} kilometers per hour.`);
-        
-        showNotification('Weather Update', 
-            `Temperature: ${weatherData.temperature}°C<br>
-            Condition: ${weatherData.condition}<br>
-            Humidity: ${weatherData.humidity}%<br>
-            Wind: ${weatherData.wind} km/h`, 'info', 7000);
-            
-    } catch (error) {
-        console.error("Weather error:", error);
-        speak("I'm sorry, I couldn't retrieve the weather information at this time.");
+// ==================== WEATHER (Open-Meteo, no key needed) ====================
+async function getWeather(location = null) {
+  try {
+    let lat, lon, placeName = 'your location';
+
+    if (location && location.trim().length) {
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`);
+      const geo = await geoRes.json();
+      if (geo && geo.results && geo.results.length) {
+        lat = geo.results[0].latitude; lon = geo.results[0].longitude;
+        placeName = `${geo.results[0].name}${geo.results[0].country ? ', ' + geo.results[0].country : ''}`;
+      } else {
+        speak(`I couldn't find ${location}. Using your device location if permitted.`);
+      }
     }
-};
 
-// Calculate function
-const calculate = (command) => {
-    // Extract the mathematical expression from the command
-    let expression = command
-        .replace(/calculate|what is|by|please/gi, '')
-        .replace(/plus/gi, '+')
-        .replace(/add/gi, '+')
-        .replace(/minus/gi, '-')
-        .replace(/subtract/gi, '-')
-        .replace(/times|multiplied by|multiply/gi, '*')
-        .replace(/divided by|divide/gi, '/')
-        .replace(/\s+/g, '')
-        .trim();
-    
-    // Remove any non-math characters for safety
-    expression = expression.replace(/[^0-9+\-*/().]/g, '');
-    
-    try {
-        // Use Function constructor for safe evaluation
-        const result = new Function('return ' + expression)();
-        if (isNaN(result) || !isFinite(result)) {
-            speak("I'm sorry, I couldn't understand that calculation.");
-        } else {
-            speak(`The result is ${result}.`);
-            showNotification('Calculation Result', `${expression} = ${result}`, 'success', 5000);
-        }
-    } catch (error) {
-        console.error("Calculation Error:", error);
-        speak("I'm sorry, I couldn't perform that calculation. Please try again.");
+    if ((lat == null || lon == null) && navigator.geolocation) {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { maximumAge: 60000, timeout: 8000 })
+      );
+      lat = pos.coords.latitude; lon = pos.coords.longitude;
+      placeName = 'your location';
     }
-};
 
-// Set a reminder function
-const setReminder = (text, time, date) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const timeInMinutes = hours * 60 + minutes;
-    
-    reminders.push({
-        text,
-        time: timeInMinutes,
-        date: date || new Date().toDateString(),
-        triggered: false
-    });
-    
-    localStorage.setItem('jarvisReminders', JSON.stringify(reminders));
-    
-    speak(`I've set a reminder for ${text} at ${time}`);
-    showNotification('Reminder Set', `"${text}" at ${time}`, 'success');
-};
-
-// Set a timer function
-const setTimer = (duration, unit) => {
-    const endTime = new Date();
-    
-    switch(unit) {
-        case 'second':
-        case 'seconds':
-            endTime.setSeconds(endTime.getSeconds() + duration);
-            break;
-        case 'minute':
-        case 'minutes':
-            endTime.setMinutes(endTime.getMinutes() + duration);
-            break;
-        case 'hour':
-        case 'hours':
-            endTime.setHours(endTime.getHours() + duration);
-            break;
-        default:
-            speak("I'm sorry, I didn't understand the time unit.");
-            return;
+    if (lat == null || lon == null) {
+      speak("I couldn't get location for weather.");
+      return;
     }
-    
-    timers.push({
-        duration,
-        unit,
-        endTime,
-        triggered: false
-    });
-    
-    localStorage.setItem('jarvisTimers', JSON.stringify(timers));
-    
-    speak(`I've set a timer for ${duration} ${unit}`);
-    showNotification('Timer Set', `${duration} ${unit} timer started`, 'success');
-};
 
-// Play music function (simulated)
-const playMusic = () => {
-    if (isMusicPlaying) {
-        speak("Music is already playing.");
-        return;
+    const wRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code`
+    );
+    const data = await wRes.json();
+    const c = data.current;
+    const condition = weatherCodeToText(c.weather_code);
+    speak(`Weather for ${placeName}: ${Math.round(c.temperature_2m)}°C, ${condition}. Humidity ${c.relative_humidity_2m}% with wind ${Math.round(c.wind_speed_10m)} km/h.`);
+    showNotification('Weather Update',
+      `Location: ${placeName}<br>
+       Temperature: ${Math.round(c.temperature_2m)}°C<br>
+       Feels like: ${Math.round(c.apparent_temperature)}°C<br>
+       Condition: ${condition}<br>
+       Humidity: ${c.relative_humidity_2m}%<br>
+       Wind: ${Math.round(c.wind_speed_10m)} km/h`, 'info', 8000);
+  } catch (err) {
+    console.error(err);
+    speak("Sorry, I couldn't retrieve the weather right now.");
+  }
+}
+function weatherCodeToText(code) {
+  const map = {
+    0: 'clear', 1: 'mainly clear', 2: 'partly cloudy', 3: 'overcast',
+    45: 'foggy', 48: 'depositing rime fog',
+    51: 'light drizzle', 53: 'drizzle', 55: 'dense drizzle',
+    56: 'freezing drizzle', 57: 'dense freezing drizzle',
+    61: 'light rain', 63: 'rain', 65: 'heavy rain',
+    66: 'freezing rain', 67: 'heavy freezing rain',
+    71: 'light snow', 73: 'snow', 75: 'heavy snow',
+    77: 'snow grains',
+    80: 'light showers', 81: 'showers', 82: 'violent showers',
+    85: 'light snow showers', 86: 'heavy snow showers',
+    95: 'thunderstorm', 96: 'thunderstorm with hail', 99: 'severe thunderstorm with hail'
+  };
+  return map[code] || 'unknown conditions';
+}
+
+// ==================== TASKS, REMINDERS, TIMERS ====================
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function persist() {
+  localStorage.setItem('jarvisTasks', JSON.stringify(tasks));
+  localStorage.setItem('jarvisReminders', JSON.stringify(reminders));
+  localStorage.setItem('jarvisTimers', JSON.stringify(timers));
+}
+
+function checkDueItems(now = new Date()) {
+  // Reminders
+  let changed = false;
+  reminders.forEach(r => {
+    if (!r.triggered && r.dueAt && now.getTime() >= r.dueAt) {
+      r.triggered = true;
+      speak(`Reminder: ${r.text}`);
+      showNotification('Reminder', r.text, 'info', 10000);
+      beep(2, 150, 1020);
+      changed = true;
     }
-    
-    isMusicPlaying = true;
-    const track = musicTracks[currentTrackIndex];
-    speak(`Now playing ${track.title} by ${track.artist}`);
-    showNotification('Now Playing', `${track.title} by ${track.artist}`, 'info');
-};
-
-// Stop music function (simulated)
-const stopMusic = () => {
-    if (!isMusicPlaying) {
-        speak("No music is currently playing.");
-        return;
+  });
+  // Timers
+  timers.forEach(t => {
+    if (!t.triggered && t.endAt && now.getTime() >= t.endAt) {
+      t.triggered = true;
+      speak(`Timer completed: ${t.label || `${t.duration} ${t.unit}`}.`);
+      showNotification('Timer Completed', t.label || `${t.duration} ${t.unit}`, 'info', 10000);
+      beep(3, 120, 900);
+      changed = true;
     }
-    
-    isMusicPlaying = false;
-    speak("Music stopped.");
-    showNotification('Music Stopped', 'Playback stopped', 'info');
-};
+  });
+  if (changed) persist();
+}
 
-// Next track function (simulated)
-const nextTrack = () => {
-    currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
-    const track = musicTracks[currentTrackIndex];
-    
-    if (isMusicPlaying) {
-        speak(`Now playing ${track.title} by ${track.artist}`);
-        showNotification('Now Playing', `${track.title} by ${track.artist}`, 'info');
-    } else {
-        speak(`Next track will be ${track.title} by ${track.artist}`);
+// Parse durations like "5 minutes", "1 hour 30 minutes", "90 sec"
+function parseDuration(str) {
+  str = (str || '').toLowerCase();
+  const parts = { h: 0, m: 0, s: 0 };
+  const patterns = [
+    { re: /(\d+)\s*h(ours?)?/g, key: 'h' },
+    { re: /(\d+)\s*m(in(ute)?s?)?/g, key: 'm' },
+    { re: /(\d+)\s*s(ec(ond)?s?)?/g, key: 's' },
+  ];
+  let matched = false;
+  for (const p of patterns) {
+    let m; while ((m = p.re.exec(str))) { parts[p.key] += parseInt(m[1], 10); matched = true; }
+  }
+  if (!matched) {
+    const m = /(\d+)\s*(seconds?|minutes?|hours?)/.exec(str);
+    if (m) {
+      const val = parseInt(m[1], 10);
+      const unit = m[2].startsWith('hour') ? 'h' : m[2].startsWith('minute') ? 'm' : 's';
+      parts[unit] += val; matched = true;
     }
-};
+  }
+  const totalMs = (parts.h * 3600 + parts.m * 60 + parts.s) * 1000;
+  return totalMs > 0 ? { ms: totalMs, parts } : null;
+}
 
-// Previous track function (simulated)
-const previousTrack = () => {
-    currentTrackIndex = (currentTrackIndex - 1 + musicTracks.length) % musicTracks.length;
-    const track = musicTracks[currentTrackIndex];
-    
-    if (isMusicPlaying) {
-        speak(`Now playing ${track.title} by ${track.artist}`);
-        showNotification('Now Playing', `${track.title} by ${track.artist}`, 'info');
-    } else {
-        speak(`Previous track will be ${track.title} by ${track.artist}`);
+// Parse time phrases: "at 6 pm", "tomorrow at 18:30", "on monday 9am"
+function extractDateTime(text) {
+  text = (text || '').toLowerCase();
+  const now = new Date();
+
+  // Relative: "in 5 minutes"
+  const rel = /in\s+(.+?)(?:$|\.|,)/.exec(text);
+  if (rel) {
+    const dur = parseDuration(rel[1]);
+    if (dur) return new Date(now.getTime() + dur.ms);
+  }
+
+  // Day names
+  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  for (let i = 0; i < 7; i++) {
+    const d = days[i];
+    if (text.includes(`on ${d}`)) {
+      const target = new Date(now);
+      const delta = (i - now.getDay() + 7) % 7 || 7; // next occurrence
+      target.setDate(now.getDate() + delta);
+      const t = extractClockTime(text) || { h: 9, m: 0, ampm: null };
+      setTimeOnDate(target, t.h, t.m, t.ampm);
+      return target;
     }
-};
+  }
 
-// Adjust volume function
-const adjustVolume = (direction) => {
-    if (direction === 'up') {
-        volume = Math.min(100, volume + 10);
-        speak(`Volume increased to ${volume} percent`);
-    } else if (direction === 'down') {
-        volume = Math.max(0, volume - 10);
-        speak(`Volume decreased to ${volume} percent`);
-    } else if (direction === 'mute') {
-        volume = 0;
-        speak("Volume muted");
-    } else if (direction === 'unmute') {
-        volume = 50;
-        speak("Volume unmuted");
-    }
-    
-    localStorage.setItem('jarvisVolume', volume.toString());
-    showNotification('Volume Adjusted', `Volume set to ${volume}%`, 'info');
-};
+  // "tomorrow"
+  if (text.includes('tomorrow')) {
+    const target = new Date(now);
+    target.setDate(now.getDate() + 1);
+    const t = extractClockTime(text) || { h: 9, m: 0, ampm: null };
+    setTimeOnDate(target, t.h, t.m, t.ampm);
+    return target;
+  }
 
-// Tell a random fact function
-const tellFact = () => {
-    const randomFact = facts[Math.floor(Math.random() * facts.length)];
-    speak(randomFact);
-    showNotification('Did You Know?', randomFact, 'info', 8000);
-};
+  // Specific date: yyyy-mm-dd
+  const dmatch = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+  if (dmatch) {
+    const target = new Date(parseInt(dmatch[1]), parseInt(dmatch[2]) - 1, parseInt(dmatch[3]));
+    const t = extractClockTime(text) || { h: 9, m: 0, ampm: null };
+    setTimeOnDate(target, t.h, t.m, t.ampm);
+    return target;
+  }
 
-// Tell a random joke function
-const tellJoke = () => {
-    const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
-    speak(randomJoke);
-    showNotification('Joke', randomJoke, 'info', 7000);
-};
+  // "at 6 pm", "at 18:30"
+  const clock = extractClockTime(text);
+  if (clock) {
+    const target = new Date(now);
+    setTimeOnDate(target, clock.h, clock.m, clock.ampm);
+    if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+    return target;
+  }
+
+  return null;
+}
+function extractClockTime(text) {
+  let m = /at\s+(\d{1,2}):(\d{2})\s*(am|pm)?/.exec(text);
+  if (m) return { h: parseInt(m[1], 10), m: parseInt(m[2], 10), ampm: m[3] || null };
+  m = /at\s+(\d{1,2})\s*(am|pm)/.exec(text);
+  if (m) return { h: parseInt(m[1], 10), m: 0, ampm: m[2] };
+  return null;
+}
+function setTimeOnDate(date, h, m, ampm) {
+  if (ampm) {
+    let hh = h % 12;
+    if (ampm.toLowerCase() === 'pm') hh += 12;
+    date.setHours(hh, m, 0, 0);
+  } else {
+    date.setHours(h, m, 0, 0);
+  }
+}
+
+// Reminders
+function setReminder(text, when) {
+  if (!(when instanceof Date) || isNaN(when.getTime())) {
+    speak("I couldn't understand the time for that reminder.");
+    return;
+  }
+  const r = { id: uid(), text, dueAt: when.getTime(), triggered: false };
+  reminders.push(r);
+  persist();
+  speak(`Reminder set for ${formatDateTime(when)}: ${text}`);
+  showNotification('Reminder Set', `"${escapeHTML(text)}" at ${formatDateTime(when)}`, 'success');
+}
+function listReminders() {
+  const upcoming = reminders.filter(r => !r.triggered).sort((a,b) => a.dueAt - b.dueAt);
+  if (upcoming.length === 0) {
+    speak("You have no upcoming reminders.");
+  } else {
+    const lines = upcoming.slice(0, 6).map(r => `• ${formatDateTime(new Date(r.dueAt))}: ${r.text}`);
+    speak(`You have ${upcoming.length} upcoming reminder${upcoming.length>1?'s':''}.`);
+    showNotification('Reminders', lines.join('<br>'), 'info', 10000);
+  }
+}
+function clearReminders() {
+  reminders = [];
+  persist();
+  speak("All reminders cleared.");
+  showNotification('Reminders', 'All reminders cleared', 'info');
+}
+
+// Timers
+function setTimer(durationText) {
+  const dur = parseDuration(durationText);
+  if (!dur) { speak("I didn't understand that duration."); return; }
+  const endAt = Date.now() + dur.ms;
+  const label = durationText;
+  timers.push({ id: uid(), label, endAt, triggered: false, duration: dur.parts.m || dur.parts.s || dur.parts.h || '', unit: '' });
+  persist();
+  speak(`Timer started for ${label}.`);
+  showNotification('Timer Set', `Timer running: ${escapeHTML(label)}`, 'success');
+}
+function listTimers() {
+  const active = timers.filter(t => !t.triggered);
+  if (active.length === 0) speak("You have no active timers.");
+  else {
+    const now = Date.now();
+    const text = active.map(t => {
+      const left = Math.max(0, t.endAt - now);
+      return `• ${t.label} — ${formatDuration(left)} remaining`;
+    }).join('\n');
+    speak(`You have ${active.length} timer${active.length>1?'s':''} running.`);
+    showNotification('Active Timers', text.replace(/\n/g,'<br>'), 'info', 8000);
+  }
+}
+function clearTimers() {
+  timers = [];
+  persist();
+  speak("All timers cleared.");
+}
+function formatDateTime(d) {
+  return d.toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit', month:'short', day:'numeric' });
+}
+function formatDuration(ms) {
+  const s = Math.round(ms/1000);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return (h?`${h}h `:'') + (m?`${m}m `:'') + `${sec}s`;
+}
+
+// ==================== WEB / OPEN / SEARCH ====================
+function openWebsite(siteText) {
+  if (!siteText) { speak("Which website should I open?"); return; }
+  const clean = siteText.toLowerCase().replace(/^open\s+/, '').trim();
+
+  // Known mapping
+  if (websites[clean]) {
+    window.open(websites[clean], '_blank');
+    speak(`Opening ${capitalize(clean)}.`);
+    showNotification('Browser', `Opening ${capitalize(clean)}`, 'info');
+    return;
+  }
+
+  // If looks like a domain
+  if (clean.includes('.') || clean.startsWith('www.')) {
+    const url = clean.startsWith('http') ? clean : `https://${clean}`;
+    window.open(url, '_blank');
+    speak(`Opening ${clean}.`);
+    showNotification('Browser', `Opening ${escapeHTML(url)}`, 'info');
+    return;
+  }
+
+  // Otherwise, Google it
+  performSearch(clean);
+}
+function performSearch(query, engine = 'google') {
+  const map = {
+    google: q => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+    youtube: q => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`
+  };
+  const url = (engine === 'youtube' ? map.youtube : map.google)(query);
+  window.open(url, '_blank');
+  speak(`Searching ${engine} for ${query}.`);
+  showNotification('Search', `Searching ${engine}: ${escapeHTML(query)}`, 'info');
+}
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ==================== ENTERTAINMENT ====================
+function playMusic() {
+  if (isMusicPlaying) { speak("Music is already playing."); return; }
+  isMusicPlaying = true;
+  const track = musicTracks[currentTrackIndex];
+  speak(`Now playing ${track.title} by ${track.artist}.`);
+  showNotification('Now Playing', `${escapeHTML(track.title)} by ${escapeHTML(track.artist)}`, 'info');
+}
+function stopMusic() {
+  if (!isMusicPlaying) { speak("No music is currently playing."); return; }
+  isMusicPlaying = false;
+  speak("Music stopped.");
+  showNotification('Music', 'Playback stopped', 'info');
+}
+function nextTrack() {
+  currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
+  const track = musicTracks[currentTrackIndex];
+  if (isMusicPlaying) speak(`Now playing ${track.title} by ${track.artist}.`);
+  else speak(`Next track selected: ${track.title}.`);
+}
+function previousTrack() {
+  currentTrackIndex = (currentTrackIndex - 1 + musicTracks.length) % musicTracks.length;
+  const track = musicTracks[currentTrackIndex];
+  if (isMusicPlaying) speak(`Now playing ${track.title} by ${track.artist}.`);
+  else speak(`Previous track selected: ${track.title}.`);
+}
+function tellJoke() {
+  const j = jokes[Math.floor(Math.random() * jokes.length)];
+  speak(j);
+  showNotification('Joke', escapeHTML(j), 'info', 7000);
+}
+function tellFact() {
+  const f = facts[Math.floor(Math.random() * facts.length)];
+  speak(f);
+  showNotification('Did You Know?', escapeHTML(f), 'info', 8000);
+}
+
+// ==================== VOLUME / SYSTEM ====================
+function adjustVolume(direction) {
+  if (direction === 'up') volume = Math.min(100, volume + 10);
+  else if (direction === 'down') volume = Math.max(0, volume - 10);
+  else if (direction === 'mute') volume = 0;
+  else if (direction === 'unmute') volume = 70;
+  localStorage.setItem('jarvisVolume', volume.toString());
+  volumeRange.value = volume.toString();
+  speak(`Volume set to ${volume} percent.`);
+  showNotification('Volume', `Volume: ${volume}%`, 'info');
+}
+function systemStatus() {
+  const activeTimers = timers.filter(t => !t.triggered).length;
+  const pendingReminders = reminders.filter(r => !r.triggered).length;
+  speak(`System status: Listening ${isListening ? 'enabled' : 'disabled'}. Volume at ${volume} percent. ${activeTimers} active timer${activeTimers===1?'':'s'}. ${pendingReminders} upcoming reminder${pendingReminders===1?'':'s'}.`);
+  showNotification('System Status',
+    `Listening: ${isListening ? 'On' : 'Off'}<br>
+     Volume: ${volume}%<br>
+     Active Timers: ${activeTimers}<br>
+     Reminders: ${pendingReminders}<br>
+     Theme: ${document.body.classList.contains('light-mode') ? 'Light' : 'Dark'}`, 'info', 8000);
+}
+
+// ==================== CALCULATOR (sanitized) ====================
+function calculate(command) {
+  let expr = command
+    .replace(/calculate|what is|what's|please/gi, '')
+    .replace(/plus/gi, '+').replace(/add/gi, '+')
+    .replace(/minus/gi, '-').replace(/subtract/gi, '-')
+    .replace(/times|multiplied by|multiply/gi, '*')
+    .replace(/divided by|divide/gi, '/')
+    .replace(/\s+/g, '');
+
+  expr = expr.replace(/[^0-9+\-*/().]/g, '');
+  if (!expr) { speak("I couldn't understand that calculation."); return; }
+
+  try {
+    // Using Function + sanitize. For complex math, consider math.js in future.
+    const result = new Function('return ' + expr)();
+    if (!isFinite(result)) throw new Error('Invalid result');
+    speak(`The result is ${result}.`);
+    showNotification('Calculation', `${escapeHTML(expr)} = <b>${result}</b>`, 'success', 6000);
+  } catch {
+    speak("Sorry, I couldn't compute that.");
+  }
+}
 
 // ==================== COMMAND PROCESSING ====================
-const processCommand = (transcript) => {
-    const command = transcript.toLowerCase().trim();
-    console.log("Processing command:", command);
-
-    // Check if command starts with wake word or contains it
-    if (!command.includes(wakeWord) && !isActiveSession) {
-        return;
-    }
-
-    addMessageToLog('You', transcript);
-    
-    // Extract the command without the wake word
-    const wakeWordIndex = command.indexOf(wakeWord);
-    const commandWithoutWakeWord = command.substring(wakeWordIndex + wakeWord.length).trim();
-
-    // Check for session control commands first
-    if (command.includes('start') && command.includes(wakeWord)) {
-        if (!isActiveSession) {
-            isActiveSession = true;
-            speak("Voice recognition activated. I'm listening for your commands.");
-            showNotification('Voice Recognition', 'Listening for commands', 'info');
-            return;
-        } else {
-            speak("Voice recognition is already active.");
-            return;
-        }
-    } else if ((command.includes('goodbye') || command.includes('stop') || command.includes('shut down')) && command.includes(wakeWord)) {
-        isActiveSession = false;
-        speak("Shutting down non-essential systems. Goodbye!");
-        showNotification('System', 'JARVIS is going to sleep', 'info');
-        toggleListening(false);
-        return;
-    }
-
-    // If we're not in an active session, ignore other commands
-    if (!isActiveSession) {
-        return;
-    }
-
-    // Basic commands
-    if (commandWithoutWakeWord.includes('hello') || commandWithoutWakeWord.includes('hi')) {
-        speak(`Hello ${userName}! How can I assist you?`);
-    } else if (commandWithoutWakeWord.includes('how are you')) {
-        speak("All systems are operating at peak efficiency. Thank you for asking.");
-    } else if (commandWithoutWakeWord.includes('who are you')) {
-        speak("I am JARVIS, an advanced virtual assistant designed to be at your service.");
-    } else if (commandWithoutWakeWord.includes('what can you do')) {
-        speak("I can open websites, tell you the time, date, and weather, perform calculations, save reminders, set timers, play music, and much more. Just say 'Jarvis' followed by your command.");
-    } else if (commandWithoutWakeWord.includes('thank you') || commandWithoutWakeWord.includes('thanks')) {
-        speak("You're welcome!");
-    } else if (commandWithoutWakeWord.includes('help')) {
-        speak("You can ask me to open websites, check the time or date, get weather information, set reminders, play music, tell jokes, or perform calculations. Say 'Jarvis, what can you do' for a full list of commands.");
-    
-    // Web commands
-    } else if (commandWithoutWakeWord.includes('open ')) {
-        // Extract website name from command
-        const siteName = commandWithoutWakeWord.replace('open ', '').trim();
-        openWebsite(siteName);
-    } else if (commandWithoutWakeWord.startsWith('search for')) {
-        const query = commandWithoutWakeWord.substring('search for'.length).trim();
-        if (query.length > 0) {
-            speak(`Searching Google for ${query}`);
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
-            showNotification('Search', `Searching for: ${query}`, 'info');
-        } else {
-            speak("What would you like me to search for?");
-        }
-    
-    // Time and date commands
-    } else if (commandWithoutWakeWord.includes('what time is it') || commandWithoutWakeWord.includes('what is the time')) {
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-        speak(`The current time is ${time}`);
-    } else if (commandWithoutWakeWord.includes('what date is it') || commandWithoutWakeWord.includes('what is the date')) {
-        const date = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        speak(`Today is ${date}`);
-    } else if (commandWithoutWakeWord.includes("what day is it") || commandWithoutWakeWord.includes("what is the day")) {
-        const day = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-        speak(`Today is ${day}.`);
-    } else if (commandWithoutWakeWord.includes("what month is it") || commandWithoutWakeWord.includes("what is the month")) {
-        const month = new Date().toLocaleDateString('en-US', { month: 'long' });
-        speak(`The current month is ${month}.`);
-    } else if (commandWithoutWakeWord.includes("what year is it") || commandWithoutWakeWord.includes("what is the year")) {
-        const year = new Date().toLocaleDateString('en-US', { year: 'numeric' });
-        speak(`The current year is ${year}.`);
-    } else if (commandWithoutWakeWord.includes("what week is it") || commandWithoutWakeWord.includes("what is the week")) {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), 0, 1);
-        const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
-        const oneWeek = 1000 * 60 * 60 * 24 * 7;
-        const week = Math.floor(diff / oneWeek) + 1;
-        speak(`It is week number ${week} of the year.`);
-    
-    // Weather command
-    } else if (commandWithoutWakeWord.includes("what's the weather") || commandWithoutWakeWord.includes("how's the weather") || commandWithoutWakeWord.includes("weather")) {
-        // Extract location if mentioned
-        let location = null;
-        if (commandWithoutWakeWord.includes('in ')) {
-            const inIndex = commandWithoutWakeWord.indexOf('in ');
-            location = commandWithoutWakeWord.substring(inIndex + 3).trim();
-        }
-        getWeather(location);
-    
-    // Task and reminder commands
-    } else if (commandWithoutWakeWord.startsWith('remind me to') || commandWithoutWakeWord.startsWith('add task') || commandWithoutWakeWord.startsWith('create a reminder')) {
-        let taskText = "";
-        if (commandWithoutWakeWord.startsWith('remind me to')) {
-            taskText = commandWithoutWakeWord.substring('remind me to'.length).trim();
-        } else if (commandWithoutWakeWord.startsWith('add task')) {
-            taskText = commandWithoutWakeWord.substring('add task'.length).trim();
-        } else {
-            taskText = commandWithoutWakeWord.substring('create a reminder'.length).trim();
-        }
-        
-        if (taskText.length > 0) {
-            // Try to extract time if mentioned
-            const timeMatch = taskText.match(/(at|for) (\d{1,2}:\d{2})/);
-            let time = "12:00"; // Default time
-            let cleanTaskText = taskText;
-            
-            if (timeMatch) {
-                time = timeMatch[2];
-                cleanTaskText = taskText.replace(timeMatch[0], '').trim();
-            }
-            
-            tasks.push(cleanTaskText);
-            localStorage.setItem('jarvisTasks', JSON.stringify(tasks));
-            
-            // Also add to reminders if time was specified
-            if (timeMatch) {
-                setReminder(cleanTaskText, time);
-            } else {
-                speak(`Okay, I've saved the reminder: ${cleanTaskText}`);
-                showNotification('Task Added', cleanTaskText, 'success');
-            }
-        } else {
-            speak("What would you like me to remind you about?");
-        }
-    } else if (commandWithoutWakeWord.includes('what are my tasks') || commandWithoutWakeWord.includes('show my reminders') || commandWithoutWakeWord.includes('list tasks')) {
-        if (tasks.length === 0) {
-            speak("You have no pending tasks.");
-        } else {
-            speak("Here are your saved reminders:");
-            // Create a short delay between speaking each task
-            tasks.forEach((task, index) => {
-                setTimeout(() => {
-                    speak(task);
-                }, index * 1500);
-            });
-            showNotification('Your Tasks', tasks.join('<br>'), 'info', 10000);
-        }
-    } else if (commandWithoutWakeWord.includes('clear my tasks') || commandWithoutWakeWord.includes('clear reminders') || commandWithoutWakeWord.includes('delete tasks')) {
-        tasks = [];
-        localStorage.setItem('jarvisTasks', '[]');
-        speak("I have cleared all your reminders.");
-        showNotification('Tasks Cleared', 'All tasks have been removed', 'info');
-    
-    // Timer commands
-    } else if (commandWithoutWakeWord.includes('set a timer for') || commandWithoutWakeWord.includes('set timer for')) {
-        const timerRegex = /set (?:a )?timer for (\d+) (\w+)/;
-        const match = commandWithoutWakeWord.match(timerRegex);
-        
-        if (match) {
-            const duration = parseInt(match[1]);
-            const unit = match[2];
-            setTimer(duration, unit);
-        } else {
-            speak("I didn't understand the timer duration. Please try something like 'set a timer for 5 minutes'.");
-        }
-    
-    // Calculation commands
-    } else if (commandWithoutWakeWord.startsWith('calculate') || commandWithoutWakeWord.startsWith('what is')) {
-        calculate(commandWithoutWakeWord);
-    
-    // Entertainment commands
-    } else if (commandWithoutWakeWord.includes('tell me a joke') || commandWithoutWakeWord.includes('joke')) {
-        tellJoke();
-    } else if (commandWithoutWakeWord.includes('tell me a fact') || commandWithoutWakeWord.includes('fact')) {
-        tellFact();
-    } else if (commandWithoutWakeWord.includes('play news')) {
-        speak("Here are the latest news headlines. Scientists have discovered a new species in the Amazon rainforest. The stock market reached record highs today. A new space mission to Mars is being planned for next year.");
-    } else if (commandWithoutWakeWord.includes('movie recommendations')) {
-        speak("I recommend watching Inception, The Dark Knight, Interstellar, The Matrix, or Avatar. All of these are excellent films with great reviews.");
-    
-    // Music commands
-    } else if (commandWithoutWakeWord.includes('play music') || commandWithoutWakeWord.includes('start music')) {
-        playMusic();
-    } else if (commandWithoutWakeWord.includes('stop music') || commandWithoutWakeWord.includes('pause music')) {
-        stopMusic();
-    } else if (commandWithoutWakeWord.includes('next track') || commandWithoutWakeWord.includes('next song')) {
-        nextTrack();
-    } else if (commandWithoutWakeWord.includes('previous track') || commandWithoutWakeWord.includes('previous song')) {
-        previousTrack();
-    
-    // System commands
-    } else if (commandWithoutWakeWord.includes('toggle theme') || commandWithoutWakeWord.includes('change theme') || commandWithoutWakeWord.includes('switch theme')) {
-         document.body.classList.toggle('light-mode');
-         const theme = document.body.classList.contains('light-mode') ? "light" : "dark";
-         speak(`Switched to ${theme} mode.`);
-         showNotification('Theme Changed', `${theme} mode activated`, 'info');
-    } else if (commandWithoutWakeWord.includes('increase volume') || commandWithoutWakeWord.includes('volume up')) {
-        adjustVolume('up');
-    } else if (commandWithoutWakeWord.includes('decrease volume') || commandWithoutWakeWord.includes('volume down')) {
-        adjustVolume('down');
-    } else if (commandWithoutWakeWord.includes('mute')) {
-        adjustVolume('mute');
-    } else if (commandWithoutWakeWord.includes('unmute')) {
-        adjustVolume('unmute');
-    } else if (commandWithoutWakeWord.includes('system status')) {
-        speak(`System status: All systems operational. Volume is at ${volume} percent. ${tasks.length} tasks pending. ${reminders.length} reminders set.`);
-        showNotification('System Status', 
-            `Volume: ${volume}%<br>
-            Tasks: ${tasks.length}<br>
-            Reminders: ${reminders.length}<br>
-            Theme: ${document.body.classList.contains('light-mode') ? 'Light' : 'Dark'}`, 'info', 8000);
-    } else {
-        speak("Command not recognized. Please try again.");
-    }
-};
-
-// ==================== SPEECH RECOGNITION CONTROL ====================
-const toggleListening = (shouldListen) => {
-    if (!recognition) {
-        statusDiv.textContent = "SPEECH RECOGNITION NOT SUPPORTED";
-        startBtn.disabled = true;
-        return;
-    }
-    
-    if (shouldListen) {
-        isListening = true;
-        isActiveSession = true;
-        try {
-            recognition.start();
-            startBtn.style.backgroundColor = '#dc2626';
-            buttonText.textContent = 'Stop Listening';
-            statusDiv.textContent = 'LISTENING';
-            statusDiv.classList.add('listening-indicator');
-            showNotification('Voice Recognition', 'Listening for commands', 'info');
-        } catch (error) {
-            console.error("Error starting recognition:", error);
-            setTimeout(() => toggleListening(true), 500);
-        }
-    } else {
-        isListening = false;
-        isActiveSession = false;
-        try {
-            recognition.stop();
-            startBtn.style.backgroundColor = '#0891b2';
-            buttonText.textContent = 'Activate Listening';
-            statusDiv.textContent = 'AWAITING COMMAND';
-            statusDiv.classList.remove('listening-indicator');
-        } catch (error) {
-            console.error("Error stopping recognition:", error);
-        }
-    }
-};
-
-// ==================== INITIALIZE SPEECH RECOGNITION ====================
-if (recognition) {
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-    recognition.maxAlternatives = 1;
-
-    // Add event listener to start button
-    startBtn.addEventListener('click', () => toggleListening(!isListening));
-    
-    recognition.onstart = () => {
-        console.log("Speech recognition started.");
-        statusDiv.textContent = 'LISTENING';
-    };
-
-    recognition.onend = () => {
-        console.log("Speech recognition ended.");
-        if (isActiveSession && isListening) {
-            setTimeout(() => {
-                try { 
-                    recognition.start(); 
-                    console.log("Restarted speech recognition");
-                } catch(e) { 
-                    console.error("Could not restart recognition:", e);
-                    // If there's an error, try again after a longer delay
-                    setTimeout(() => {
-                        try {
-                            recognition.start();
-                        } catch (err) {
-                            console.error("Still couldn't restart recognition:", err);
-                            statusDiv.textContent = 'RECOGNITION ERROR';
-                            showNotification('Recognition Error', 'Failed to restart voice recognition', 'error');
-                        }
-                    }, 1000);
-                }
-            }, 300);
-        } else {
-            statusDiv.textContent = 'AWAITING COMMAND';
-        }
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        processCommand(transcript);
-    };
-
-    recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        let errorMessage = "An error occurred with the speech recognition.";
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            errorMessage = "Microphone access was denied. Please allow microphone access in your browser settings.";
-            statusDiv.textContent = 'MIC ACCESS DENIED';
-            showNotification('Permission Required', 'Microphone access is needed for voice commands', 'error', 10000);
-        } else if (event.error === 'no-speech') {
-            return; 
-        } else {
-            statusDiv.textContent = 'RECOGNITION ERROR';
-            showNotification('Recognition Error', 'An error occurred with voice recognition', 'error');
-        }
-        
-        if (event.error !== 'no-speech') {
-            speak(errorMessage);
-            toggleListening(false);
-        }
-    };
-
-    // Start listening for the wake word on page load
-    setTimeout(() => {
-        try {
-            recognition.start();
-            statusDiv.textContent = 'LISTENING FOR WAKE WORD';
-        } catch (e) {
-            console.error("Error starting recognition on load:", e);
-        }
-    }, 1000);
-} else {
-    statusDiv.textContent = "BROWSER INCOMPATIBLE";
-    startBtn.disabled = true;
-    speak("I'm sorry, but it looks like your browser doesn't support the necessary voice technology for me to work.");
-    showNotification('Browser Incompatible', 'Your browser does not support speech recognition', 'error');
+function normalizeText(s) { return s.toLowerCase().trim(); }
+function stripWakeWord(command) {
+  const idx = command.indexOf(WAKE_WORD);
+  if (idx >= 0) return command.slice(idx + WAKE_WORD.length).trim().replace(/^[,.:;-]\s*/, '');
+  return command;
 }
 
-// ==================== ADDITIONAL INITIALIZATION ====================
-// Show welcome notification
+function processCommand(rawTranscript, source = 'voice') {
+  const transcript = normalizeText(rawTranscript);
+  if (!transcript) return;
+
+  // Only log user messages after we normalize
+  addMessageToLog('You', rawTranscript);
+
+  // Wake word handling
+  const hasWakeWord = transcript.includes(WAKE_WORD);
+  let c = stripWakeWord(transcript);
+
+  // Session control
+  if ((/start\b/.test(c) && hasWakeWord) || (/^start\b/.test(c))) {
+    isActiveSession = true; isListening = true;
+    speak("Voice recognition activated. I'm listening.");
+    safeStartRecognition();
+    showNotification('Voice Recognition', 'Listening for commands', 'info');
+    return;
+  }
+  if ((/(stop|sleep|shut\s*down|goodbye|bye)\b/.test(c) && hasWakeWord) || (/^(stop|sleep)\b/.test(c))) {
+    isActiveSession = false; isListening = false;
+    speak("Shutting down non‑essential systems. Goodbye!");
+    safeStopRecognition();
+    showNotification('System', 'JARVIS is going to sleep', 'info');
+    return;
+  }
+
+  // If voice source and not active and no wake word => ignore quietly
+  if (source === 'voice' && !isActiveSession && !hasWakeWord) return;
+
+  // If typed source, allow commands without wake word
+  if (source === 'voice' && hasWakeWord) {
+    // If only "jarvis" spoken, prompt
+    if (!c || c.length < 2) {
+      speak(`Yes ${userName}?`);
+      return;
+    }
+  }
+  if (source === 'typed') {
+    // If typed includes wake word, strip it
+    if (hasWakeWord) c = stripWakeWord(transcript);
+    else c = transcript;
+  }
+
+  // Basic small-talk
+  if (/\b(hello|hi|hey)\b/.test(c)) return speak(`Hello ${userName}! How can I help?`);
+  if (/\b(how are you|how's it going)\b/.test(c)) return speak("All systems nominal and operating at peak efficiency.");
+  if (/\bwho are you\b/.test(c)) return speak("I am JARVIS, your virtual assistant at your service.");
+  if (/\b(thank you|thanks)\b/.test(c)) return speak("You're welcome!");
+  if (/\bhelp\b/.test(c)) return speak("Try commands like: open YouTube, what's the weather, set a timer for 5 minutes, remind me to drink water at 6 pm, calculate 12 times 7, or system status.");
+
+  // User identity
+  const callMeMatch = /call me ([\w\s.'-]{2,40})/.exec(c);
+  if (callMeMatch) {
+    userName = callMeMatch[1].trim().replace(/\s+/g,' ');
+    localStorage.setItem('jarvisUserName', userName);
+    return speak(`Understood. I will call you ${userName}.`);
+  }
+
+  // Time & Date
+  if (/\bwhat (time|is the time)\b/.test(c)) {
+    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return speak(`The time is ${t}.`);
+  }
+  if (/\bwhat (date|is the date)\b/.test(c)) {
+    const d = new Date().toLocaleDateString([], { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    return speak(`Today is ${d}.`);
+  }
+  if (/\bwhat week\b/.test(c)) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
+    const oneWeek = 1000 * 60 * 60 * 24 * 7;
+    const week = Math.floor(diff / oneWeek) + 1;
+    return speak(`It is week number ${week} of the year.`);
+  }
+
+  // Web & Search
+  const ytSearch = /search (youtube) for (.+)/.exec(c);
+  if (ytSearch) return performSearch(ytSearch[2], 'youtube');
+  const gSearch = /search for (.+)/.exec(c);
+  if (gSearch) return performSearch(gSearch[1], 'google');
+  if (/^open\s+/.test(c)) return openWebsite(c.replace(/^open\s+/, ''));
+
+  // Weather
+  if (/\b(weather|what'?s the weather|how'?s the weather)\b/.test(c)) {
+    const inMatch = /\b(in|at)\s+([a-zA-Z\s.'-]+)$/.exec(c);
+    const location = inMatch ? inMatch[2] : null;
+    return getWeather(location);
+  }
+
+  // Reminders & Tasks
+  if (/^(remind me to|create a reminder|add task)/.test(c)) {
+    const text = c.replace(/^(remind me to|create a reminder|add task)\s*/,'');
+    const when = extractDateTime(text);
+    const cleanText = text.replace(/\s*(in .+|at .+|tomorrow.*|on [a-z]+.*|\d{4}-\d{1,2}-\d{1,2}.*)$/i,'').trim() || text;
+    if (when) setReminder(cleanText, when);
+    else { // store as task if no time
+      tasks.push(cleanText); persist();
+      speak(`Okay, I saved a task: ${cleanText}`);
+      showNotification('Task Added', escapeHTML(cleanText), 'success');
+    }
+    return;
+  }
+  if (/\b(list|show) (reminders|tasks)\b/.test(c)) {
+    if (/tasks/.test(c)) {
+      if (tasks.length === 0) speak("You have no tasks.");
+      else {
+        const lines = tasks.map(t => `• ${t}`).join('\n');
+        speak(`You have ${tasks.length} task${tasks.length>1?'s':''}.`);
+        showNotification('Your Tasks', lines.replace(/\n/g,'<br>'), 'info', 9000);
+      }
+    } else {
+      listReminders();
+    }
+    return;
+  }
+  if (/\bclear (reminders|tasks)\b/.test(c)) {
+    if (/tasks/.test(c)) { tasks = []; persist(); speak("All tasks cleared."); }
+    else clearReminders();
+    return;
+  }
+
+  // Timers
+  if (/\b(set (a )?timer for)\b/.test(c)) {
+    const after = c.replace(/\bset (a )?timer for\b/, '').trim();
+    return setTimer(after);
+  }
+  if (/\b(list|show) timers\b/.test(c)) return listTimers();
+  if (/\bclear timers\b/.test(c)) return clearTimers();
+
+  // Calculator
+  if (/^(calculate|what is|what's)/.test(c)) return calculate(c);
+
+  // Entertainment
+  if (/\b(joke|tell me a joke)\b/.test(c)) return tellJoke();
+  if (/\b(fact|tell me a fact)\b/.test(c)) return tellFact();
+  if (/\b(play music|start music)\b/.test(c)) return playMusic();
+  if (/\b(stop music|pause music)\b/.test(c)) return stopMusic();
+  if (/\b(next track|next song)\b/.test(c)) return nextTrack();
+  if (/\b(previous track|previous song)\b/.test(c)) return previousTrack();
+  if (/\b(play news)\b/.test(c)) {
+    speak("Here are some headlines: A breakthrough in clean energy was announced. Satellite imagery revealed new ancient sites. Markets are mixed amid policy updates.");
+    return;
+  }
+  if (/\b(movie recommendations?)\b/.test(c)) {
+    speak("Try Inception, Interstellar, The Dark Knight, The Matrix, or Blade Runner 2049.");
+    return;
+  }
+
+  // System / Theme / Volume
+  if (/\b(toggle theme|change theme|switch theme)\b/.test(c)) {
+    document.body.classList.toggle('light-mode');
+    const theme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+    speak(`Switched to ${theme} mode.`);
+    showNotification('Theme Changed', `${theme} mode activated`, 'info');
+    return;
+  }
+  if (/\b(increase volume|volume up)\b/.test(c)) return adjustVolume('up');
+  if (/\b(decrease volume|volume down)\b/.test(c)) return adjustVolume('down');
+  if (/\bmute\b/.test(c)) return adjustVolume('mute');
+  if (/\bunmute\b/.test(c)) return adjustVolume('unmute');
+  if (/\bsystem status\b/.test(c)) return systemStatus();
+
+  // Fallback
+  speak("Command not recognized. Please try again or say 'Jarvis, help'.");
+}
+
+// ==================== SPEECH RECOGNITION CONTROL ====================
+function safeStartRecognition() {
+  if (!recognition) {
+    statusDiv.textContent = 'SPEECH RECOGNITION NOT SUPPORTED';
+    startBtn.disabled = true;
+    micStatus.textContent = 'VOICE UNSUPPORTED';
+    return;
+  }
+  if (recognitionRunning) return;
+  try {
+    recognition.start();
+  } catch (e) {
+    // sometimes InvalidStateError if already started
+  }
+}
+function safeStopRecognition() {
+  if (!recognition) return;
+  try { recognition.stop(); } catch {}
+}
+
+if (recognition) {
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+  recognition.maxAlternatives = 1;
+
+  // Optional simple grammar to bias wake word
+  if (SpeechGrammarList) {
+    const grammar = `#JSGF V1.0; grammar jarvis; public <cmd> = jarvis | hello | start | stop ;`;
+    const list = new SpeechGrammarList();
+    list.addFromString(grammar, 1);
+    recognition.grammars = list;
+  }
+
+  startBtn.addEventListener('click', () => {
+    if (!isListening) {
+      isListening = true; isActiveSession = true;
+      safeStartRecognition();
+      startBtn.style.backgroundColor = '#dc2626';
+      buttonText.textContent = 'Stop Listening';
+      statusDiv.classList.add('listening-indicator');
+      setStatus('LISTENING', true);
+      showNotification('Voice Recognition', 'Listening for commands', 'info');
+      beep(1, 120, 1200);
+    } else {
+      isListening = false; isActiveSession = false;
+      safeStopRecognition();
+      startBtn.style.backgroundColor = '#0891b2';
+      buttonText.textContent = 'Activate Listening';
+      statusDiv.classList.remove('listening-indicator');
+      setStatus('AWAITING COMMAND', false);
+      beep(1, 100, 600);
+    }
+  });
+
+  recognition.onstart = () => {
+    recognitionRunning = true;
+    micStatus.textContent = 'VOICE LISTENING';
+    setStatus('LISTENING', true);
+  };
+  recognition.onend = () => {
+    recognitionRunning = false;
+    micStatus.textContent = 'VOICE IDLE';
+    if (isActiveSession && isListening && document.visibilityState === 'visible') {
+      // small delay then restart
+      setTimeout(safeStartRecognition, 300);
+    } else {
+      setStatus('AWAITING COMMAND', false);
+    }
+  };
+  recognition.onresult = (event) => {
+    const transcript = event.results[event.results.length - 1][0].transcript;
+    lastTranscript = transcript;
+    processCommand(transcript, 'voice');
+  };
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error:", event.error);
+    let msg = "An error occurred with speech recognition.";
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      msg = "Microphone access denied. Please allow microphone access in your browser.";
+      statusDiv.textContent = 'MIC ACCESS DENIED';
+      micStatus.textContent = 'MIC ACCESS DENIED';
+      showNotification('Permission Required', 'Allow mic access to use voice commands.', 'error', 10000);
+    } else if (event.error === 'no-speech') {
+      // ignore silent errors
+      return;
+    } else if (event.error === 'network') {
+      msg = "Network error with voice recognition service.";
+    } else {
+      statusDiv.textContent = 'RECOGNITION ERROR';
+      showNotification('Recognition', 'Voice recognition error occurred', 'error');
+    }
+    // Stop listening on major errors
+    isListening = false; isActiveSession = false; safeStopRecognition();
+    speak(msg);
+  };
+
+  // Attempt passive start after load (may fail without user gesture)
+  setTimeout(() => {
+    try {
+      recognition.start();
+      statusDiv.textContent = 'LISTENING FOR WAKE WORD';
+      micStatus.textContent = 'WAKE WORD LISTENING';
+    } catch (e) {
+      // expected on some browsers; wait for button click
+    }
+  }, 800);
+} else {
+  statusDiv.textContent = "BROWSER INCOMPATIBLE";
+  startBtn.disabled = true;
+  micStatus.textContent = 'VOICE UNSUPPORTED';
+  showNotification('Browser Incompatible', 'Your browser does not support Web Speech API', 'error');
+}
+
+// ==================== UI EVENTS ====================
+toggleCommandsBtn.addEventListener('click', () => {
+  commandPanel.classList.toggle('open');
+  const icon = toggleCommandsBtn.querySelector('i');
+  if (commandPanel.classList.contains('open')) {
+    toggleCommandsBtn.querySelector('span').textContent = 'Hide Available Commands';
+    icon.className = 'fas fa-chevron-up';
+    // Auto-fit height
+    commandPanel.style.maxHeight = commandPanel.scrollHeight + 'px';
+  } else {
+    toggleCommandsBtn.querySelector('span').textContent = 'Show Available Commands';
+    icon.className = 'fas fa-chevron-down';
+    commandPanel.style.maxHeight = '0px';
+  }
+});
+
+settingsBtn.addEventListener('click', () => {
+  settingsPanel.classList.toggle('open');
+});
+
+themeToggleBtn.addEventListener('click', () => {
+  document.body.classList.toggle('light-mode');
+  const theme = document.body.classList.contains('light-mode') ? "light" : "dark";
+  speak(`Switched to ${theme} mode.`);
+  showNotification('Theme Changed', `${theme} mode activated`, 'info');
+});
+
+// Typed input
+sendCmdBtn.addEventListener('click', () => {
+  const v = textInput.value.trim();
+  if (!v) return;
+  processCommand(v, 'typed');
+  textInput.value = '';
+});
+textInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendCmdBtn.click();
+});
+
+// ==================== WELCOME ====================
 setTimeout(() => {
-    showNotification('JARVIS Online', 'System initialized. Say "Jarvis start" to begin.', 'success', 5000);
-}, 2000);
+  showNotification('JARVIS Online', 'System initialized. Say "Jarvis start" or click Activate Listening.', 'success', 5000);
+}, 600);
